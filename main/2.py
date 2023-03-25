@@ -23,14 +23,16 @@ def ellipsoid(x, D, A, b, t, n, m):
             break
 
         # Violated constraint
-        a = A[rowIdx][:]
+        a = np.array([[val] for val in A[rowIdx][:]])
 
         # Update step
-        Da = np.dot(D, a.T)
-        quadratic = np.dot(a, Da)
+        Da = np.dot(D, a)
+        quadratic = np.dot(a.T, Da)[0][0]
+        middle = np.dot(a, a.T)
+        Da = Da.flatten()
 
-        x += x_factor/quadratic * Da
-        D = D_factor1 * (D - D_factor2/quadratic * np.dot(Da, Da.T))
+        x += x_factor/np.sqrt(quadratic) * Da
+        D = D_factor1 * (D - D_factor2/quadratic * np.dot(D, np.dot(middle, D)))
         i += 1
     
     return x, D, status
@@ -86,18 +88,19 @@ D_factor2 = 2/(n+1)
 # Run ellipsoid algorithm
 x, D, status = ellipsoid(x, D, A, b, t, n, m)
 
+
 if status == "Infeasible":
     print(status)
 else:
     # Sliding objective method
     A = np.append(A, [-c[:]], axis=0)
-    b = np.append(b, -np.dot(c, x.T))
+    b = np.append(b, -np.dot(c, x))
 
     num_iter = 0
     while status == "Feasible":
         # Run ellipsoid algorithm for 1 iteration
         # Check feasibility
-        z = np.dot(A, x.T)
+        z = np.dot(A, x)
         rowIdx = -1
         for j in range(m):
             if z[j] < b[j]:
@@ -119,20 +122,22 @@ else:
             status = "Infeasible"
         else:
             # Violated constraint
-            a = A[rowIdx][:]
+            a = np.array([[val] for val in A[rowIdx][:]])
 
             # Update step
-            Da = np.dot(D, a.T)
-            quadratic = np.dot(a, Da)
+            Da = np.dot(D, a)
+            quadratic = np.dot(a.T, Da)[0][0]
+            middle = np.dot(a, a.T)
+            Da = Da.flatten()
 
-            x += x_factor/quadratic * Da
-            D = D_factor1 * (D - D_factor2/quadratic * np.dot(Da, Da.T))
-            b[-1] = -np.dot(c, x.T)
+            x += x_factor/np.sqrt(quadratic) * Da
+            D = D_factor1 * (D - D_factor2/quadratic * np.dot(D, np.dot(middle, D)))
+            b[-1] = -np.dot(c, x)
         num_iter += 1
 
-    final_objective = np.dot(c, x.T)
-    print("%.7f" % final_objective)
-    for var in x:
-        print("%.7f" % var, end=" ")
-    print()
-    print(num_iter)
+final_objective = np.dot(c, x)
+print("%.7f" % final_objective)
+for var in x:
+    print("%.7f" % var, end=" ")
+print()
+print(num_iter)
