@@ -1,6 +1,7 @@
 import numpy as np
 
 def ellipsoid(x, D, A, b, t, n, m):
+
     # Constants
     x_factor = 1/(n+1)
     D_factor1 = n**2/(n**2 - 1)
@@ -11,6 +12,7 @@ def ellipsoid(x, D, A, b, t, n, m):
 
     # Run for fixed iterations
     while i < t:
+
         # Check feasibility
         z = np.dot(A, x)
         rowIdx = -1
@@ -23,19 +25,15 @@ def ellipsoid(x, D, A, b, t, n, m):
             break
 
         # Violated constraint
-        # a = np.array([[val] for val in A[rowIdx][:]])
         a = A[rowIdx][:]
 
         # Update step
         Da = np.dot(D, a)
         quadratic = np.dot(a, Da)
-        # quadratic = np.dot(a.T, Da)[0][0]
-        # middle = np.dot(a, a.T)
-        # Da = Da.flatten()
 
         x += (x_factor/np.sqrt(quadratic)) * Da
         D = D_factor1 * (D - D_factor2/quadratic * np.dot(np.array([Da]).T, np.array([Da])))
-        # D = D_factor1 * (D - D_factor2/quadratic * np.dot(D, np.dot(middle, D)))
+
         i += 1
     
     return x, D, status
@@ -104,14 +102,14 @@ if status == "Infeasible":
     print(status)
 else:
     # Sliding objective method
-    # A = np.append(A, [-c[:]], axis=0)
-    # b = np.append(b, -np.dot(c, x))
 
     num_iter = 0
     while status == "Feasible" and num_iter < t:
+        
         # Run ellipsoid algorithm for 1 iteration
         A = np.append(A, np.array([-c[:]]), axis=0)
         b = np.append(b, -np.dot(c, x))
+
         # Check feasibility
         z = np.dot(A, x)
         rowIdx = -1
@@ -119,36 +117,23 @@ else:
             if z[j] < b[j]:
                 rowIdx = j
                 break
-        
-        # if rowIdx == -1:
-        #     for j in range(m+n, len(A)):
-        #         if z[j] < b[j]:
-        #             rowIdx = j
-        #             break
 
         if num_iter == 0:
             rowIdx = m+n
-
-        # if z[-1] < b[-1]:
-        #     rowIdx = m
 
         if rowIdx == -1:
             status = "Infeasible"
         else:
             # Violated constraint
-            # a = np.array([[val] for val in A[rowIdx][:]])
             a = A[rowIdx][:]
 
             # Update step
             Da = np.dot(D, a)
             quadratic = np.dot(a, Da)
-            # quadratic = np.dot(a.T, Da)[0][0]
-            # middle = np.dot(a, a.T)
-            # Da = Da.flatten()
+            
             x += x_factor/np.sqrt(quadratic) * Da
             D = D_factor1 * (D - D_factor2/quadratic * np.dot(np.array([Da]).T, np.array([Da])))
-            # D = D_factor1 * (D - D_factor2/quadratic * np.dot(D, np.dot(middle, D)))
-            # b[-1] = -np.dot(c, x)
+            
         num_iter += 1
 
 final_objective = np.dot(c, x)
@@ -156,4 +141,3 @@ print("%.7f" % final_objective)
 for var in x:
     print("%.7f" % var, end=" ")
 print()
-# print(num_iter)
