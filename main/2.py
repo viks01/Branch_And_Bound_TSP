@@ -136,8 +136,8 @@ else:
             
         num_iter += 1
 
-final_objective = np.dot(c, x)
-print("%.7f" % final_objective)
-for var in x:
-    print("%.7f" % var, end=" ")
-print()
+    final_objective = np.dot(c, x)
+    print("%.7f" % final_objective)
+    for var in x:
+        print("%.7f" % var, end=" ")
+    print()
