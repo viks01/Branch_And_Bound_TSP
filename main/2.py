@@ -31,6 +31,10 @@ def ellipsoid(x, D, A, b, t, n, m):
         Da = np.dot(D, a)
         quadratic = np.dot(a, Da)
 
+        if quadratic <= 0:
+            status = "Infeasible"
+            break
+
         x += (x_factor/np.sqrt(quadratic)) * Da
         D = D_factor1 * (D - D_factor2/quadratic * np.dot(np.array([Da]).T, np.array([Da])))
 
@@ -117,6 +121,9 @@ else:
             if z[j] < b[j]:
                 rowIdx = j
                 break
+            if j >= m+n and z[j] == b[j]:
+                rowIdx = j
+                break
 
         if num_iter == 0:
             rowIdx = m+n
@@ -130,12 +137,23 @@ else:
             # Update step
             Da = np.dot(D, a)
             quadratic = np.dot(a, Da)
+
+            if quadratic <= 0:
+                status = "Infeasible"
+                break
             
             x += x_factor/np.sqrt(quadratic) * Da
             D = D_factor1 * (D - D_factor2/quadratic * np.dot(np.array([Da]).T, np.array([Da])))
             
         num_iter += 1
 
+    # Fix floating point error
+    for i in range(len(x)):
+        val = x[i]
+        if abs(val - round(val)) < 0.001:
+            x[i] = round(val)
+
+    # Display result
     final_objective = np.dot(c, x)
     print("%.7f" % final_objective)
     for var in x:
