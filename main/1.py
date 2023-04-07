@@ -77,9 +77,10 @@ def simplex(table, basic):
         maxIdx = -1                                  # index of entering variable
         for i in range(len(table[0]) - 1):
             val = table[0][i]
-            if val > 0 and val < maxVal:             # entering variable has smallest positive reduced cost
+            if val > 0:                              # least-index entering variable with positive reduced cost
                 maxVal = val
                 maxIdx = i
+                break
         
         # If maxIdx < 0, then the while loop is skipped and the optimal solution is reached
         while maxIdx >= 0:
@@ -170,8 +171,8 @@ def display_result(table, basic, status, N=0):
         for val in res:
             print("%.7f" % val, end=" ")
         print()
-    # else:
-    #     print(status)
+    else:
+        print(status)
 
 # Get all subsets of array
 def powerset(array):
