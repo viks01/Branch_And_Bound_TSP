@@ -1,3 +1,38 @@
+class Node:
+    def __init__(self, A, b, c, N=None, branch_var=None, branch_val=None):
+        self.A = A
+        self.b = b
+        self.c = c
+        self.N = N
+
+        self.branch_var = branch_var
+        self.branch_val = branch_val
+
+        self.table = None
+        self.basic = None
+        self.status = None
+        
+        self.solved = False
+
+        self.optimal_point = None
+        self.optimal_value = None
+    
+    def solve(self):
+        self.table, self.basic, self.status, self.optimal_point, self.optimal_value = two_phased_method(self.A, self.b, self.c, len(self.A), len(self.A[0]), self.N, self.branch_var, self.branch_val)
+        self.solved = True
+
+    def get_optimal_point(self, size=None):
+        if self.solved:
+            if size:
+                return self.optimal_point[:size]
+            return self.optimal_point
+        return None
+    
+    def get_optimal_value(self):
+        if self.solved:
+            return self.optimal_value
+        return None
+
 def display_table(table):
     for i in range(len(table)):
         for j in range(len(table[0])):
@@ -302,110 +337,227 @@ for i in range(num_edges+n, num_rows):
         if (i-n-num_edges) == (j-2*num_edges):
             A[i][j] = -1
 
-########################################### Phase 1 ###########################################
+def two_phased_method(A, b, c, num_rows, num_cols, num_edges, branch_var=None, branch_val=None):
+    ########################################### Phase 1 ###########################################
 
-# Find total number of artificial variables to include (n + v or num_constraints - num_edges)
-num_artificial = num_rows - num_edges
+    # Find total number of artificial variables to include (n + v or num_constraints - num_edges)
+    num_artificial = num_rows - num_edges
 
-# Store total number of variables for phase 1 in a separate variable
-t = num_cols + num_artificial
+    # Store total number of variables for phase 1 in a separate variable
+    t = num_cols + num_artificial
 
-# Set the basic variables list to all artificial variables and the slack variables from the <= constraints
-basic = [i for i in range(num_edges, 2*num_edges)] + [i for i in range(num_cols, t)]
+    # Set the basic variables list to all artificial variables and the slack variables from the <= constraints
+    basic = [i for i in range(num_edges, 2*num_edges)] + [i for i in range(num_cols, t)]
 
-# Initialize the objective vector
-e = [0 for _ in range(num_cols)]
-for i in range(num_cols, t):
-    e.append(1)
+    # Initialize the objective vector
+    e = [0 for _ in range(num_cols)]
+    for i in range(num_cols, t):
+        e.append(1)
 
-# Initialize vector of decision variables (non-basic variables are 0 and basic variables are elements of b)
-x = initial_x0(basic, t, b)
+    # Initialize vector of decision variables (non-basic variables are 0 and basic variables are elements of b)
+    x = initial_x0(basic, t, b)
 
-################################### Initialize tableau form ###################################
-# First row
-table = [[-i for i in e]]
+    # First row
+    table = [[-i for i in e]]
 
-# Add rows corresponding to matrix A
-for i in range(num_rows):
-    table.append(A[i][:])
+    # Add rows corresponding to matrix A
+    for i in range(num_rows):
+        table.append(A[i][:])
 
-# Augment table with num_edges x num_artificial matrix of zeroes
-for i in range(1, num_edges+1):
-    for j in range(num_artificial):
-        table[i].append(0)
-
-# Augment table with num_artificial x num_artificial identity matrix
-for i in range(num_edges+1, num_rows+1):
-    for j in range(num_cols, t):
-        if (i-1-num_edges) == (j-num_cols):
-            table[i].append(1)
-        else:
+    # Augment table with num_edges x num_artificial matrix of zeroes
+    for i in range(1, num_edges+1):
+        for j in range(num_artificial):
             table[i].append(0)
 
-# Last column or RHS
-table[0].append(0)
-for i in range(1, num_rows+1):
-    table[i].append(b[i-1])
-
-# Make basic variables zero in 1st row by adding all rows to first row
-for j in range(t+1):
-    total = 0
+    # Augment table with num_artificial x num_artificial identity matrix
     for i in range(num_edges+1, num_rows+1):
-        total += table[i][j]
-    table[0][j] += total
+        for j in range(num_cols, t):
+            if (i-1-num_edges) == (j-num_cols):
+                table[i].append(1)
+            else:
+                table[i].append(0)
 
-###############################################################################################
+    # Last column or RHS
+    table[0].append(0)
+    for i in range(1, num_rows+1):
+        table[i].append(b[i-1])
 
-# Run simplex algorithm
-table, basic, status = simplex(table, basic)
-solution = get_solution(table, basic, len(table[0])-1)
+    # Make basic variables zero in 1st row by adding all rows to first row
+    for j in range(t+1):
+        total = 0
+        for i in range(num_edges+1, num_rows+1):
+            total += table[i][j]
+        table[0][j] += total
 
-###############################################################################################
+    # Initial problem record
+    # initial_record = Record(table, basic)
 
-# Check for infeasibility (both artificial variables and objective value need to be 0 (account for floating point error))
-for i in range(num_cols, t):
-    if abs(solution[i]) > 0.001:
-        status = "Infeasible"
-        break
-        
-if abs(table[0][-1]) > 0.001:
-    status = "Infeasible"
-
-if status != "Infeasible":
-    ########################################### Phase 2 ###########################################
-    
-    # Form a new table with lesser columns without the artificial variables
-    new_table = [[-i for i in c]]
-    new_table[0].append(0)
-    for i in range(1, len(table)):
-        # Don't add rows corresponding to artificial variables (in case of redundant constraint)
-        if basic[i-1] < num_cols:
-            row = table[i][:num_cols]
-            row.append(table[i][-1])
-            new_table.append(row)
-
-    # Modify basic to exclude artificial variables (in case of redundant constraint)
-    new_basic = []
-    for j in basic:
-        if j < num_cols:
-            new_basic.append(j)
-    basic = new_basic
-
-    # Make basic variables zero in 1st row
-    for j in range(len(basic)):
-        basicVarIdx = basic[j]
-        pivot = new_table[0][basicVarIdx]
-        if pivot != 0:
-            rowIdx = j+1   # Since the 1 in the column of a basic variable is located at the corresponding row of the basic variable
-            for i in range(num_cols+1):
-                new_table[0][i] -= pivot * new_table[rowIdx][i]
+    # Add branching constraint if applicable
+    if branch_var is not None:
+        table.append([0 for _ in range(t+1)])
+        table[-1][branch_var] = 1
+        table[-1][-1] = branch_val
+        for i in range(len(table)):
+            table[i].append(table[i][-1])
+            table[i][-2] = 0
+        table[-1][-2] = 1
+        table[0][-2] = -1
+        for j in range(len(table[0])):
+            table[0][j] += table[-1][j]
+        basic.append(t)
 
     # Run simplex algorithm
-    new_table, basic, status = simplex(new_table, basic)
-    solution = get_solution(new_table, basic, len(table[0])-1)
-    table = new_table
-    # display_result(new_table, basic, status, num_edges)
+    table, basic, status = simplex(table, basic)
+    solution = get_solution(table, basic, len(table[0])-1)
+    optimal_point = solution[:num_edges]
+
+    # phase1_record = Record(table, basic, status, optimal_point, table[0][-1])
+
     ###############################################################################################
+
+    # Check for infeasibility (both artificial variables and objective value need to be 0 (account for floating point error))
+    for i in range(num_cols, t):
+        if abs(solution[i]) > 0.001:
+            status = "Infeasible"
+            break
+
+    if branch_var is not None:
+        if abs(solution[t]) > 0.001:
+            status = "Infeasible"
+            
+    if abs(table[0][-1]) > 0.001:
+        status = "Infeasible"
+
+    ########################################### Phase 2 ###########################################
+    if status != "Infeasible":
+        
+        # Form a new table with lesser columns without the artificial variables
+        new_table = [[-i for i in c]]
+        new_table[0].append(0)
+        for i in range(1, len(table)):
+            # Don't add rows corresponding to artificial variables (in case of redundant constraint)
+            if basic[i-1] < num_cols:
+                row = table[i][:num_cols]
+                row.append(table[i][-1])
+                new_table.append(row)
+
+        # Modify basic to exclude artificial variables (in case of redundant constraint)
+        new_basic = []
+        for j in basic:
+            if j < num_cols:
+                new_basic.append(j)
+        basic = new_basic
+
+        # Make basic variables zero in 1st row
+        for j in range(len(basic)):
+            basicVarIdx = basic[j]
+            pivot = new_table[0][basicVarIdx]
+            if pivot != 0:
+                rowIdx = j+1   # Since the 1 in the column of a basic variable is located at the corresponding row of the basic variable
+                for i in range(num_cols+1):
+                    new_table[0][i] -= pivot * new_table[rowIdx][i]
+
+        # initial_record2 = Record(new_table, basic)
+        
+        # Run simplex algorithm
+        table, basic, status = simplex(new_table, basic)
+        solution = get_solution(new_table, basic, len(table[0])-1)
+        optimal_point = solution[:num_edges]
+
+        # Fix floating point error
+        for i in range(num_edges):
+            val = optimal_point[i]
+            if abs(val - round(val)) < 0.001:
+                optimal_point[i] = round(val)
+
+        # phase2_record = Record(table, basic, status, optimal_point, table[0][-1])
+
+    ###############################################################################################
+
+    return table, basic, status, optimal_point, table[0][-1]
+
+table, basic, status, optimal_point, cost = two_phased_method(A, b, c, num_rows, num_cols, num_edges)
+
+# Check for no edges selected
+no_edges_selected = True
+for val in optimal_point:
+    if val > 0:
+        no_edges_selected = False
+        break
+
+if no_edges_selected:
+    for i in range(num_edges):
+        optimal_point[i] = 1.0
+
+    cost = sum(c)
+
+if status == "Infeasible" or status == "Unbounded":
+    print("Problem is " + status)
+    exit()
+
+# Branch and bound
+problems = []
+best_cost = float("inf")
+best_solution = None
+
+# Fix floating point error
+for i in range(num_edges):
+    val = optimal_point[i]
+    if abs(val - round(val)) < 0.001:
+        optimal_point[i] = round(val)
+
+# Check for integer solution
+branch_and_bound = False
+branch_var = 0
+for val in optimal_point:
+    if val != int(val):
+        branch_and_bound = True
+        break
+    branch_var += 1
+
+if not branch_and_bound:
+    best_cost = cost
+    best_solution = optimal_point
+else:
+    table1 = [row[:] for row in A]
+    rhs1 = b[:]
+    node1 = Node(A=table1, b=rhs1, c=c, N=num_edges, branch_var=branch_var, branch_val=0)
+    problems.append(node1)
+
+    table2 = [row[:] for row in A]
+    rhs2 = b[:]
+    node2 = Node(A=table2, b=rhs2, c=c, N=num_edges, branch_var=branch_var, branch_val=1)
+    problems.append(node2)
+
+    while len(problems) > 0:
+        problem = problems.pop(0)
+        problem.solve()
+        if problem.status != "Infeasible":
+            integral_solution = True
+            branch_var = 0
+            for val in problem.optimal_point:
+                if val != int(val):
+                    integral_solution = False
+                    break
+                branch_var += 1
+            
+            beta = problem.get_optimal_solution()
+            z = problem.get_optimal_value()
+            if integral_solution and z < best_cost:
+                best_cost = z
+                best_solution = beta
+            else:
+                if z >= best_cost:
+                    continue
+                table1 = [row[:] for row in A]
+                rhs1 = b[:]
+                node1 = Node(A=table1, b=rhs1, c=c, N=num_edges, branch_var=branch_var, branch_val=0)
+                problems.append(node1)
+
+                table2 = [row[:] for row in A]
+                rhs2 = b[:]
+                node2 = Node(A=table2, b=rhs2, c=c, N=num_edges, branch_var=branch_var, branch_val=1)
+                problems.append(node2)
 
 # Output matrix
 X = [[0 for _ in range(n)] for _ in range(n)]
@@ -414,12 +566,12 @@ X = [[0 for _ in range(n)] for _ in range(n)]
 k = 0
 for i in range(n-1):
     for j in range(i+1, n):
-        X[i][j] = solution[k]
-        X[j][i] = solution[k]
+        X[i][j] = best_solution[k]
+        X[j][i] = best_solution[k]
         k += 1
 
 # Display output
-print("%.7f" % table[0][-1])
+print("%.7f" % best_cost)
 for i in range(n):
     for j in range(n):
         print("%.7f" % X[i][j], end=" ")
